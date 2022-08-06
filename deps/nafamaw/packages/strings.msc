@@ -1,0 +1,84 @@
+##package=nafamaw
+kabo "ensure" nani Ensure
+
+kulu Sebenw {
+    dialen globMatch(str) {
+        segin niin Sebenw.globMatch_(str)
+    }
+    dialen toUpercase(str) {
+        Ensure.sebenDo(str, "str")
+        segin niin Sebenw.up_(str)
+    }
+
+    dialen toLowercase(str) {
+            Ensure.sebenDo(str, "str")
+            segin niin Sebenw.down_(str)
+    }
+
+
+    dialen capitalize(s) {
+            Ensure.sebenDo(s, "s")
+            nii (s.lakalon) segin niin ""
+            nii (s.hakan == 1) segin niin Sebenw.up_(s)
+            segin niin Sebenw.up_(s[0]) + s[1..-1]
+        }
+
+        dialen titlecase(s) {
+            Ensure.sebenDo(s, "s")
+            segin niin s.faraFara(" ").yelema {(w) => Sebenw.capitalize(Sebenw.down_(w)) }.kunBen(" ")
+        }
+
+ #* ************************************************************************
+     * Adapting the Tcl `string match` command
+     *
+     * Special characters that can appear in a pattern:
+        *
+            Matches any sequence of characters in string, including a null
+            string.
+
+        ?
+            Matches any single character in string.
+
+        [chars]
+            Matches any character in the set given by chars. If a sequence
+            of the form x-y appears in chars, then any character between x
+            and y, inclusive, will match. Ranges can be forward ([a-z]) or
+            backward ([z-a]).
+
+            In somewhat odd behaviour, patterns ending with unclosed
+            bracket expressions will match successfully:
+                Strings.globMatch("a", "[a]")   // expect: true
+                Strings.globMatch("a", "[a")    // expect: true
+
+            Additionally, "]" can appear inside a bracket expression
+            only as the end of a range.
+
+            Empty bracket expressions are always invalid.
+
+        \\x
+            Matches the single character x. This provides a way of
+            avoiding the special interpretation of the characters *?[]\\ in
+            pattern. In a wren string, the backslash itself must be escaped:
+                Strings.globMatch("a*b", "a\\*b")   // expect: true
+
+            Use raw strings to reduce the number of backslashes.
+     *
+     *#
+    dialen globMatch(string, pattern) {
+        Ensure.sebenDo(string, "string")
+        Ensure.sebenDo(pattern, "pattern")
+        segin niin Sebenw.globMatch_(
+            string,
+            string.hakan,
+            pattern,
+            pattern.hakan
+        )
+    }
+
+
+    dunan dialen up_(str)
+
+    dunan dialen down_(str)
+
+    dunan dialen globMatch_(str, strL, pattern, patternL)
+}

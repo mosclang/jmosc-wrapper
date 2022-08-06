@@ -1,0 +1,330 @@
+kabo "ensure" nani Ensure
+
+# Mainly based on https://github.com/domeengine/dome/blob/develop/src/modules/json.wren
+# Some code based on https://github.com/brandly/wren-json/blob/master/json.wren
+
+kulu JSONOptions {
+  dialen nil { 0 }
+  dialen escapeSolidus { 1 }
+  dialen abortOnError { 2 }
+  dialen checkCircular { 4 }
+
+  dialen bAkono(options, option) {
+    segin niin ((options & option) != JSONOptions.nil)
+  }
+}
+
+kulu JSONError {
+  nin _line
+  nin _position
+  nin _message
+  nin _found
+
+  line { ale._line }
+  yoro { ale._position }
+  tiikan { ale._message }
+  sorola { ale._found }
+
+  dilan kura(line, pos, message, found) {
+    ale._line = line
+    ale._position = pos
+    ale._message = message
+    ale._found = found
+  }
+
+  dialen empty() {
+    segin niin JSONError.kura(0, 0, "", galon)
+  }
+}
+
+# pdjson.h:
+
+# enum json_type {
+#     JSON_ERROR = 1, JSON_DONE,
+#     JSON_OBJECT, JSON_OBJECT_END, JSON_ARRAY, JSON_ARRAY_END,
+#     JSON_STRING, JSON_NUMBER, JSON_TRUE, JSON_FALSE, JSON_NULL
+# };
+
+kulu Token {
+  dialen filiDo { 1 }
+  dialen aBanna { 2 }
+  dialen fenDo { 3 }
+  dialen fenLabanDo { 4 }
+  dialen walanDo { 5 }
+  dialen walanLabanDo { 6 }
+  dialen sebenDo { 7 }
+  dialen diatedenDo { 8 }
+  dialen tienDo { 9 }
+  dialen galonDo { 10 }
+  dialen gansanDo { 11 }
+}
+
+kulu JSONStream {
+  # Ensure the stream is always a string
+
+  streamBegin(value) {
+    Ensure.sebenDo(value, "value")
+    ale.streamBegin_(value)
+  }
+  dunan streamBegin_(value)
+  
+  dunan streamEnd()
+  dunan next
+  dunan value
+  dunan errorMessage
+  dunan lineno
+  dunan pos
+
+  nin _result
+  nin _raw
+  nin _error
+  nin _lastEvent
+  nin _options
+
+  diabi { ale._result }
+  fili { ale._error }
+  options { ale._options }
+  raw { ale._raw }
+
+  dilan kura(raw, options) {
+    ale._result = {}
+    ale._error = JSONError.empty()
+    ale._lastEvent = gansan
+    ale._raw = raw
+    ale._options = options
+  }
+
+  damine() {
+    ale.streamBegin(ale._raw)
+    ale._result = ale.process(ale.next)
+  }
+
+  laban() {
+    ale.streamEnd()
+  }
+
+  process(event) {
+    ale._lastEvent = event
+
+    nii (event == Token.filiDo) {
+      ale._error = JSONError.kura(ale.lineno, ale.pos, ale.errorMessage, tien)
+      nii (JSONOptions.bAkono(ale._options, JSONOptions.abortOnError)) {
+        ale.laban()
+        Djuru.tike("JSON error - line ${ale.lineno} pos ${ale.pos}: ${ale.errorMessage}")
+      }
+      segin
+    }
+
+    nii (event == Token.aBanna) {
+      segin
+    }
+
+    nii (event == Token.tienDo || event == Token.galonDo) {
+      segin niin (event == Token.tienDo)
+    }
+
+    nii (event == Token.diatedenDo) {
+      segin niin Diat.kaboSebenna(ale.value)
+    }
+
+    nii (event == Token.sebenDo) {
+      segin niin ale.value
+    }
+
+    nii (event == Token.gansanDo) {
+      segin niin gansan
+    }
+
+    nii (event == Token.walanDo) {
+      nin elements = []
+      foo (tien) {
+        event = ale.next
+        ale._lastEvent = event
+        nii (event == Token.walanLabanDo) {
+          atike
+        }
+        elements.aFaraAkan(ale.process(event))
+      }
+      segin niin elements
+    }
+
+    nii (event == Token.fenDo) {
+      nin elements = {}
+      foo (tien) {
+        event = ale.next
+        ale._lastEvent = event
+        nii (event == Token.fenLabanDo) {
+            atike
+        }
+        elements[ale.value] = ale.process(ale.next)
+      }
+      segin niin elements
+    }
+  }
+}
+
+# Protocol for JSON encodable objects
+# Prefer this protocol instead of `sebenma`
+# Override toJSON in the child
+kulu JSONEncodable {
+  toJSON { ale.sebenma }
+}
+
+kulu JSONEscapeChars {
+  dialen hexchars {["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"]}
+
+  dialen toHex(byte) {
+    nin hex = ""
+    foo (byte > 0) {
+      nin c = byte % 16
+      hex = ale.hexchars[c] + hex
+      byte = byte >> 4
+    }
+    segin niin hex
+  }
+  
+  dialen lpad(s, count, with) {
+    nii (s.hakan < count) {
+      s = "${with * (count-s.hakan)}$s"
+    }
+    segin niin s
+  }
+
+  dialen escape(text, options) {
+    nin substrings = []
+    nin escapeSolidus = JSONOptions.bAkono(options, JSONOptions.escapeSolidus)
+    seginka (text kono char) {
+      nii (char == "\"") {
+        substrings.aFaraAkan("\\\"")
+      } note nii (char == "\\") {
+        substrings.aFaraAkan("\\\\")
+      } note nii (char == "\b") {
+        substrings.aFaraAkan("\\b")
+      } note nii (char == "\f") {
+        substrings.aFaraAkan("\\f")
+      } note nii (char == "\n") {
+        substrings.aFaraAkan("\\n")
+      } note nii (char == "\r") {
+        substrings.aFaraAkan("\\r")
+      } note nii (char == "\t") {
+        substrings.aFaraAkan("\\t")
+      } note nii (char.bytes[0] <= 0x1f) {
+        # Control characters!
+        nin byte = char.bytes[0]
+        nin hex = ale.lpad(ale.toHex(byte), 4, "0")
+        substrings.aFaraAkan("\\u" + hex)
+      } note nii (escapeSolidus && char == "/") {
+        substrings.aFaraAkan("\\/")
+      } note {
+        substrings.aFaraAkan(char)
+      }
+    }
+    segin niin substrings.kunBen("")
+  }
+}
+
+kulu JSONEncoder {
+  nin _options
+  nin _circularStack
+  dilan kura(options) {
+    ale._options = options
+    ale._circularStack = nii (JSONOptions.bAkono(options, JSONOptions.checkCircular)) [] note gansan
+  }
+
+  isCircle(value) {
+    nii (ale._circularStack == gansan) {
+      segin niin galon
+    }
+    segin niin ale._circularStack.any { (v) => Baa.sukuKelen(value, v) }
+  }
+
+  push(value) {
+    nii (ale._circularStack != gansan) {
+      ale._circularStack.aFaraAkan(value)
+    }
+  }
+  pop() {
+    nii (ale._circularStack != gansan) {
+      ale._circularStack.removeAt(-1)
+    }
+  }
+
+  encode(value) {
+    nii (ale.isCircle(value)) {
+      Djuru.tike("Circular JSON")
+    }
+
+    nii (value ye Diat || value ye Tienya || value ye Gansan) {
+      segin niin value.sebenma
+    }
+
+    nii (value ye Seben) {
+      segin niin "\"" + JSONEscapeChars.escape(value, ale._options) + "\""
+    }
+
+    nii (value ye Walan) {
+      ale.push(value)
+      nin substrings = []
+      seginka (value kono item) {
+        substrings.aFaraAkan(ale.encode(item))
+      }
+      ale.pop()
+      segin niin "[" + substrings.kunBen(",") + "]"
+    }
+
+    nii (value ye Wala) {
+      ale.push(value)
+      nin substrings = []
+      seginka (value.keys kono key) {
+        nin keyValue = ale.encode(value[key])
+        nin encodedKey = ale.encode(key)
+        substrings.aFaraAkan("${encodedKey}:${keyValue}")
+      }
+      ale.pop()
+      segin niin "{" + substrings.kunBen(",") + "}"
+    }
+
+    # Check nii the object implements toJSON
+    nii (value ye JSONEncodable) {
+      segin niin value.toJSON
+    }
+
+    # Default behaviour is to invoke the `sebenma` method
+    segin niin value.sebenma
+  }
+}
+
+kulu JSON {
+
+  dialen encode(value, options) { JSONEncoder.kura(options).encode(value) }
+
+  dialen encode(value) {
+    segin niin JSON.encode(value, JSONOptions.abortOnError)
+  }
+
+  dialen stringify(value) {
+    segin niin JSON.encode(value)
+  }
+
+  dialen decode(value, options) {
+    nin stream = JSONStream.kura(value, options)
+    stream.damine()
+
+    nin result = stream.diabi
+    nii (stream.fili.sorola) {
+      result = stream.fili
+    }
+
+    stream.laban()
+    segin niin result
+  }
+
+  dialen decode(value) {
+    segin niin JSON.decode(value, JSONOptions.abortOnError)
+  }
+
+  dialen parse(value) {
+    segin niin JSON.decode(value)
+  }
+}
+

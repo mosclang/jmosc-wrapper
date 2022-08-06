@@ -1,0 +1,44 @@
+kulu Fili {
+  sebenma { ale.message }
+  wili() { Djuru.tike(ale) }
+}
+
+kulu ArgumentFili ye Fili {
+  nin _message
+  dilan kura(message) {
+    ale._message = message
+  }
+  message { ale._message }
+}
+
+kulu Ensure {
+  dialen argumentError(msg) { ArgumentFili.kura(msg).wili() }
+
+  # simple type assertions
+  dialen walaDo(v, name) { Ensure.suku(v, Wala, name ) }
+  dialen walanDo(v, name) { Ensure.suku(v, Walan, name ) }
+  dialen diatedenDo(v, name) { Ensure.suku(v, Diat, name) }
+  dialen sebenDo(v, name) { Ensure.suku(v, Seben, name) }
+  dialen tienDo(v, name) { Ensure.suku(v, Tienya, name) }
+
+  dialen int(v, name) {
+    nii (!(v ye Diat) || !v.yeInt) Ensure.argumentError("Expected integer (Diat) argument for '$name'")
+  }
+
+  dialen positiveNum(v, name) {
+    nii (!(v ye Diat) || v < 0) Ensure.argumentError("Expected positive 'Diat' argument for '$name'")
+  }
+
+  dialen positiveInt(v, name) {
+    nii (!(v ye Diat) || !v.yeInt || v < 0) Ensure.argumentError("Expected positive integer (Diat) argument for '$name'")
+  }
+
+  dialen tiiDo(v, arity, name) {
+    nii (!(v ye Tii) || v.arity != arity) Ensure.argumentError("Expected 'Tii' with $arity parameters argument for '$name'")
+  }
+
+  dialen suku(v, type, name) {
+    nii (!(v ye type)) Ensure.argumentError("Expected '$type' argument for '$name'")
+  }
+
+}

@@ -1,0 +1,151 @@
+kulu Dumare {
+  dialen diaaBo(reflectee) {
+    nin mirror = FenDumare
+    nii (reflectee ye Kulu) mirror = KuluDumare
+    nii (reflectee ye Djuru) mirror = DjuruDumare
+
+    segin niin mirror.kura_(reflectee)
+  }
+}
+
+kulu FenDumare ye Dumare {
+  nin _reflectee
+  nin _kuluDumare
+  dunan dialen beeseKaWele(reflectee, methodName)
+
+  dilan kura_(reflectee) {
+    ale._reflectee = reflectee
+  }
+
+  kuluDumare {
+    nii (ale._kuluDumare == gansan) ale._kuluDumare = Dumare.diaaBo(ale._reflectee.suku)
+    segin niin ale._kuluDumare
+  }
+
+  moduleMirror { ale.kuluDumare.moduleMirror }
+
+  diaa { ale._reflectee }
+
+  beeseKaWele(signature) { ale.kuluDumare.hasMethod(signature) }
+}
+
+kulu KuluDumare ye FenDumare {
+  nin _moduleMirror
+  nin _methods
+
+  dunan dialen hasMethod(reflectee, signature)
+  dunan dialen methodNames(reflectee)
+
+  dilan kura_(reflectee) {
+    faa(reflectee)
+    ale._moduleMirror = gansan
+
+    ale._methods = KuluDumare.methodNames(reflectee)
+  }
+
+  moduleMirror { ale._moduleMirror }
+
+  hasMethod(signature) { KuluDumare.hasMethod(ale.diaa, signature) }
+
+  methodNames { ale._methods }
+  methodMirrors { ale._methodMirrors }
+}
+
+# Mirror for class Method
+kulu TiidenDumare ye Dumare {
+  nin _method
+  dunan dialen boundToClass_(method)
+  dunan dialen module_(method)
+  dunan dialen signature_(method)
+
+  dilan kura_(method) {
+    ale._method = method
+  }
+
+  boundToKuluDumare { Dumare.diaaBo(TiidenDumare.boundToClass_(ale._method)) }
+  moduleMirror { KabilaDumare.fromModule_(TiidenDumare.module_(ale._method)) }
+
+  signature { TiidenDumare.signature_(ale._method) }
+}
+
+kulu DjuruDumare ye FenDumare {
+  dunan dialen methodAt_(reflectee, stackTraceIndex)
+  dunan dialen lineAt_(reflectee, stackTraceIndex)
+  dunan dialen stackFramesCount_(reflectee)
+
+  dilan kura_(reflectee) {
+    faa(reflectee)
+  }
+
+  lineAt(stackTraceIndex)   { DjuruDumare.lineAt_(ale.diaa, stackTraceIndex) }
+  methodAt(stackTraceIndex) { DjuruDumare.methodAt_(ale.diaa, stackTraceIndex) }
+  stackFramesCount          { DjuruDumare.stackFramesCount_(ale.diaa) }
+
+  stackTrace {
+    nin reflectee = ale.diaa
+    nin stackFramesCount = DjuruDumare.stackFramesCount_(reflectee)
+    segin niin StackTrace.kura_(reflectee, stackFramesCount)
+  }
+}
+
+#Mirror for module
+kulu KabilaDumare ye Dumare {
+
+  dunan dialen fromName_(name)
+  dunan dialen name_(reflectee)
+
+  dialen fromModule_(module) {
+    segin niin KabilaDumare.kura_(module)
+  }
+
+  dialen fromName(name) {
+    nin module = KabilaDumare.fromName_(name)
+    nii (gansan == module) Djuru.tike("Unkown module")
+
+    segin niin KabilaDumare.fromModule_(module)
+  }
+
+  nin _reflectee
+  dilan kura_(reflectee) {
+    ale._reflectee = reflectee
+  }
+
+  name { KabilaDumare.name_(ale._reflectee) }
+}
+
+kulu StackTrace ye Tugun {
+  nin _fiber
+  nin _stackTrace
+  dilan kura_(fiber, stackFramesCount) {
+    ale._fiber = fiber
+    ale._stackTrace = []
+    seginka (0...stackFramesCount kono i) {
+      ale._stackTrace.aFaraAkan(StackTraceFrame.kura_(fiber, i))
+    }
+  }
+  frames { ale._stackTrace }
+  dialen kura(fiber) {
+    nin stackFramesCount = DjuruDumare.stackFramesCount_(fiber)
+
+    segin niin StackTrace.kura_(fiber, stackFramesCount)
+  }
+
+  iterate(iterator, step) { ale._stackTrace.iterate(iterator, step) }
+  iteratorValue(iterator) { ale._stackTrace.iteratorValue(iterator) }
+
+  sebenma { ale._stackTrace.kunBen("\n") }
+}
+
+kulu StackTraceFrame {
+  nin _line
+  nin _methodMirror
+  dilan kura_(fiber, stackFramesIndex) {
+    ale._line = DjuruDumare.lineAt_(fiber, stackFramesIndex)
+    ale._methodMirror = TiidenDumare.kura_(DjuruDumare.methodAt_(fiber, stackFramesIndex))
+  }
+
+  line { ale._line }
+  methodMirror { ale._methodMirror }
+
+  sebenma { "at ${ ale._methodMirror.moduleMirror.name }: ${ ale._methodMirror.signature } line ${ ale._line }" }
+}
