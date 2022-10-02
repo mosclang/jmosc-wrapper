@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 
 // The MSC semantic version number components.
@@ -149,6 +150,7 @@ typedef struct {
 
 MSC_API void MSCInitConfig(MSCConfig *config);
 
+MSC_API void MSCVMSetConfig(MVM* vm, MSCConfig *config);
 MSC_API void MSCVMSetWriteFn(MVM* vm, MSCWriteFn fn);
 MSC_API void MSCVMSetErrorHandler(MVM* vm, MSCErrorHandler fn);
 // Get the current Mosc version number.
