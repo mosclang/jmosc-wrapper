@@ -4,6 +4,7 @@ project(javamosc)
 set(CMAKE_C_STANDARD 99)
 set(MSC_SOURCE_FILES)
 set(MSC_INCLUDE_DIRS)
+set(MSC_DEPS)
 
 file(GLOB SOURCE_FILES_CR src/*.c)
 file(GLOB SOURCE_FILES_HR src/*.h)
@@ -51,11 +52,16 @@ file(GLOB SOURCE_FILES_INC deps/nafamaw/**/*.inc)
 
 LIST(APPEND MSC_SOURCE_FILES ${SOURCE_FILES_C} ${SOURCE_FILES_H} ${SOURCE_FILES_INC})
 LIST(APPEND MSC_SOURCE_FILES deps/nafamaw/nafamaw.c deps/nafamaw/nafamaw.h)
-
+IF (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    LIST(APPEND MSC_DEPS m)
+ELSEIF (CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    LIST(APPEND MSC_DEPS m)
+ENDIF ()
 
 
 add_library(javamosc SHARED ${MSC_SOURCE_FILES})
 TARGET_INCLUDE_DIRECTORIES(javamosc PRIVATE ${MSC_INCLUDE_DIRS})
+TARGET_LINK_LIBRARIES(javamosc PRIVATE ${MSC_DEPS})
 
 set(SOURCE_FILES test/main.c)
 add_executable(jmosctest ${SOURCE_FILES})
