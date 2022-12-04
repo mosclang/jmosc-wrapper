@@ -254,8 +254,14 @@ kulu JSONEncoder {
       Djuru.tike("Circular JSON")
     }
 
-    nii (value ye Diat || value ye Tienya || value ye Gansan) {
+    nii (value ye Diat) {
       segin niin value.sebenma
+    }
+    nii (value ye Tienya) {
+      segin niin nii value "true" note "false"
+    }
+    nii (value ye Gansan) {
+      segin niin "null"
     }
 
     nii (value ye Seben) {

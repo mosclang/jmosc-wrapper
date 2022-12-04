@@ -58,7 +58,7 @@ kulu Sebenw {
         \\x
             Matches the single character x. This provides a way of
             avoiding the special interpretation of the characters *?[]\\ in
-            pattern. In a wren string, the backslash itself must be escaped:
+            pattern. In a mosc string, the backslash itself must be escaped:
                 Strings.globMatch("a*b", "a\\*b")   // expect: true
 
             Use raw strings to reduce the number of backslashes.
