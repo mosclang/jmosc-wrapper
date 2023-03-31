@@ -18,8 +18,13 @@ struct VMReturn {
 // Displays a string of text to the user.
 typedef const char* (*JWrapperModuleResolver)(const char * name);
 typedef void (*JWrapperReporter)(MVM* vm, const char *key);
+
+
+typedef MSCExternClassMethods* (*BindExternClassFn)(
+        MVM *vm, const char *module, const char *className);
+
 typedef struct JMVMConfig {
-    MSCBindExternClassFn  hostExternClassLoader;
+    BindExternClassFn  hostExternClassLoader;
     MSCBindExternMethodFn  hostExternMethodLoader;
     JWrapperModuleResolver  hostLoadModuleLoader;
     JWrapperReporter reporter;
@@ -32,10 +37,16 @@ typedef struct {
 } JMVM;
 
 
+typedef struct {
+    void* handle;
+} JVMClass;
+
 
 JMVM* newVM(MSCConfig * config,  JMVMConfig *jmvmConfig);
 VMReturnCode interpret(JMVM* jmvm, const char * module, const char* source);
 void initJVMConfig(JMVMConfig * config);
 void freeVM(JMVM* jmvm);
 void setJVMModuleResolver(JMVM *jmvm, MSCLoadModuleFn  resolver);
+void MSCSetSlotNewJVMClass(MVM *vm);
+// void initMethods(MSCExternClassMethods methods);
 #endif

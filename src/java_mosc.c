@@ -9,6 +9,12 @@
 #include "jwrapper.msc.inc"
 #include "ensure.msc.inc"
 
+typedef struct DHello {
+
+} DHello;
+static void allocateDHello(MVM *vm) {
+    MSCSetSlotNewExtern(vm, 0, 0, sizeof(JVMClass));
+}
 static void jwrapperReport(MVM *vm) {
     JMVM *underlinedVM = MSCGetUserData(vm);
     if (underlinedVM == NULL) {
@@ -56,6 +62,9 @@ static ModuleRegistry wrapperCorePackage[] =
                                 CLASS(JWrapper)
                                                 STATIC_METHOD("report_(_,_)", jwrapperReport)
                                                 // STATIC_METHOD("status_(_)", jwrapperStatus)
+                                END_CLASS
+                                CLASS(DHello)
+                                ALLOCATE(allocateDHello)
                                 END_CLASS
                 END_MODULE
                 MODULE(ensure)
@@ -146,7 +155,7 @@ static MSCExternMethodFn bindBuiltInExternMethod(
     // TODO: Assert instead of return NULL?
     ModuleRegistry *module = findModule(moduleName);
     if (module == NULL) {
-        if (underlinedVM->jmvmConfig->hostExternClassLoader != NULL) {
+        if (underlinedVM->jmvmConfig->hostExternMethodLoader != NULL) {
             return underlinedVM->jmvmConfig->hostExternMethodLoader(vm, moduleName, className, isStatic, signature);
         }
         return NULL;
@@ -165,11 +174,13 @@ static MSCExternClassMethods bindBuiltInExternClass(
     ModuleRegistry *module = findModule(moduleName);
     if (module == NULL) {
         if (underlinedVM->jmvmConfig->hostExternClassLoader != NULL) {
-            return underlinedVM->jmvmConfig->hostExternClassLoader(vm, moduleName, className);
+            MSCExternClassMethods* meths = underlinedVM->jmvmConfig->hostExternClassLoader(vm, moduleName, className);
+            // methods.finalize = NULL;
+            methods.allocate = meths->allocate;
+            methods.finalize = meths->finalize;
         }
         return methods;
     }
-
     ClassRegistry *clas = findClass(module, className);
     if (clas == NULL) return methods;
 
@@ -187,8 +198,6 @@ static MSCLoadModuleResult jwloadModulFn(MVM *vm, const char *name) {
     if (res.source == NULL && underlinedVM->jmvmConfig->hostLoadModuleLoader != NULL) {
         // try the host loading
         res.source = underlinedVM->jmvmConfig->hostLoadModuleLoader(name);
-        // printf(";;;;%s\n", res.source);
-        // free(nameCopy);
     }
     return res;
 }
@@ -207,6 +216,11 @@ void freeVM(JMVM *jmvm) {
 
 void setJVMModuleResolver(JMVM *jmvm, MSCLoadModuleFn resolver) {
     jmvm->jmvmConfig->hostLoadModuleLoader = resolver;
+}
+void MSCSetSlotNewJVMClass(MVM *vm) {
+
+    MSCSetSlotNewExtern(vm, 0, 0, sizeof(JVMClass));
+    // return handler;
 }
 
 
