@@ -1,17 +1,22 @@
 kabo "json" nani JSON
 kulu JWrapper {
     dunan dialen report_(key, value)
+    dunan dialen reportMap_(key, value)
+    dunan dialen reportList_(key, value)
     dialen report(map) {
        seginka (map kono entry) {
-           JWrapper.report(entry.key, entry.value.sebenma)
+           JWrapper.report(entry.key, entry.value)
        }
      }
     dialen report(key, value) {
-        nin valueStr = tumamin(value) {
-           ye Wala => JSON.stringify(value)
-           ye Walan => JSON.stringify(value)
-           note => value.sebenma
+       tumamin(value) {
+           ye Wala => JWrapper.reportMap_(key, JSON.stringify(value))
+           ye Walan => JWrapper.reportList_(key, JSON.stringify(value))
+           ye Diat => JWrapper.report_(key, value)
+           ye Tienya => JWrapper.report_(key, value)
+           ye Seben => JWrapper.report_(key, value)
+           ye Gansan => JWrapper.report_(key, value)
+           note => JWrapper.report_(key, value.sebenma) # convert to string
        }
-        JWrapper.report_(key, valueStr)
     }
 }

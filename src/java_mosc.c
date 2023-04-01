@@ -15,26 +15,27 @@ typedef struct DHello {
 static void allocateDHello(MVM *vm) {
     MSCSetSlotNewExtern(vm, 0, 0, sizeof(JVMClass));
 }
-static void jwrapperReport(MVM *vm) {
+static void _jwrapperReport(MVM *vm, int dataType) {
     JMVM *underlinedVM = MSCGetUserData(vm);
     if (underlinedVM == NULL) {
         return;
     }
     const char *key = MSCGetSlotString(vm, 1);
-    const char *value = MSCGetSlotString(vm, 2);
-    underlinedVM->jmvmConfig->reporter(vm, key);
+    // printf("Ket::: %s", key);
+    // const char *value = MSCGetSlotString(vm, 2);/// why ?? I don't know but its required
+    underlinedVM->jmvmConfig->reporter(vm, key, dataType);
     MSCSetSlotBool(vm, 0, true);
 }
-
-static void jwrapperStatus(MVM *vm) {
-    JMVM *underlinedVM = MSCGetUserData(vm);
-    if (underlinedVM != NULL) {
-        const char *status = MSCGetSlotString(vm, 1);
-        // underlinedVM->jmvmConfig->reporter("status", "status", status);
-        MSCSetSlotBool(vm, 0, true);
-    }
-
+static void jwrapperReport(MVM *vm) {
+    _jwrapperReport(vm, 0);
 }
+static void jwrapperReportMap(MVM *vm) {
+    _jwrapperReport(vm, 1);
+}
+static void jwrapperReportList(MVM *vm) {
+    _jwrapperReport(vm, 2);
+}
+
 
 
 // To locate foreign classes and modules, we build a big directory for them in
@@ -61,6 +62,8 @@ static ModuleRegistry wrapperCorePackage[] =
                 NAMED_MODULE(java, jwrapper)
                                 CLASS(JWrapper)
                                                 STATIC_METHOD("report_(_,_)", jwrapperReport)
+                                                STATIC_METHOD("reportMap_(_,_)", jwrapperReportMap)
+                                                STATIC_METHOD("reportList_(_,_)", jwrapperReportList)
                                                 // STATIC_METHOD("status_(_)", jwrapperStatus)
                                 END_CLASS
                                 CLASS(DHello)

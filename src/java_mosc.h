@@ -17,7 +17,7 @@ struct VMReturn {
 };
 // Displays a string of text to the user.
 typedef const char* (*JWrapperModuleResolver)(const char * name);
-typedef void (*JWrapperReporter)(MVM* vm, const char *key);
+typedef void (*JWrapperReporter)(MVM* vm, const char *key, int dataType); // dataType = 0 = PRIMITIVE, 1 = MAP, 2 = LIST
 
 
 typedef MSCExternClassMethods* (*BindExternClassFn)(
