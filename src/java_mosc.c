@@ -179,6 +179,9 @@ static MSCExternClassMethods bindBuiltInExternClass(
         if (underlinedVM->jmvmConfig->hostExternClassLoader != NULL) {
             MSCExternClassMethods* meths = underlinedVM->jmvmConfig->hostExternClassLoader(vm, moduleName, className);
             // methods.finalize = NULL;
+            if(meths == NULL || meths->allocate == NULL) {
+                return methods;
+            }
             methods.allocate = meths->allocate;
             methods.finalize = meths->finalize;
         }

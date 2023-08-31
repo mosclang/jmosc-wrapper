@@ -27,7 +27,7 @@ typedef enum {
     PREC_NONE,
     PREC_LOWEST,
     PREC_ASSIGNMENT,    // =
-    PREC_CONDITIONAL,   // ?:
+    PREC_NULLISH,       // ??
     PREC_LOGICAL_OR,    // ||
     PREC_LOGICAL_AND,   // &&
     PREC_EQUALITY,      // == !=
@@ -40,8 +40,8 @@ typedef enum {
     PREC_RANGE,         // ..
     PREC_TERM,          // + -
     PREC_FACTOR,        // * / %
-    PREC_UNARY,         // unary - ! ~ ...(spread or rest element)
-    PREC_CALL,          // . () []
+    PREC_UNARY,         // unary - + ! ~ ...(spread or rest element)
+    PREC_CALL,          // . ?. () []
     PREC_PRIMARY
 } Precedence;
 
@@ -679,6 +679,7 @@ static int getByteCountForArguments(const uint8_t *bytecode,
         case OP_TRUE:
         case OP_VOID:
         case OP_POP:
+        case OP_LOAD_ON:
         case OP_CLOSE_UPVALUE:
         case OP_RETURN:
         case OP_END:
@@ -872,8 +873,8 @@ static int emitByteArg(Compiler *compiler, Opcode instruction, int arg) {
 }
 
 // Emits [instruction] followed by a placeholder for a jump offset. The
-// placeholder can be patched by calling [jumpPatch]. Returns the index of the
-// placeholder.
+// placeholder can be patched by calling [jumpPatch].
+// Returns the index of the placeholder.
 static int emitJump(Compiler *compiler, Opcode instruction) {
     emitOp(compiler, instruction);
     emitByte(compiler, 0xff);
@@ -1395,7 +1396,7 @@ static Pattern parsePattern(Compiler *compiler, PatternType parent, bool declare
     Pattern ret;
     ret.alias = NULL;
     ret.parent = parent;
-    if (match(compiler, ID_TOKEN)) {
+    if (match(compiler, ID_TOKEN) || match(compiler, STRING_CONST_TOKEN)) {
         ret.type = NONE_PATTERN;
         initToken(&ret.as.id, compiler->parser->previous.type, compiler->parser->previous.start,
                   compiler->parser->previous.length,
@@ -1414,7 +1415,6 @@ static Pattern parsePattern(Compiler *compiler, PatternType parent, bool declare
                 newVariable(&ret.variable, symbol, compiler->scopeDepth == -1 ? SCOPE_MODULE : SCOPE_LOCAL);
                 initVariable(compiler, &ret.variable);
             }
-
         } else if (declare) {
             int symbol = declareVariable(compiler, &ret.as.id);
 
@@ -1438,12 +1438,29 @@ static Pattern parsePattern(Compiler *compiler, PatternType parent, bool declare
         MSCInitPatternBuffer(&ret.as.object);
         do {
             if (peek(compiler) == RBRACE_TOKEN) break;
+            if (match(compiler, LBRACKET_TOKEN)) {
+
+                // possible key expression
+                int symbol = declareVariable(compiler, &ret.as.id);
+                newVariable(&ret.alias->variable, symbol, compiler->scopeDepth == -1 ? SCOPE_MODULE : SCOPE_LOCAL);
+                // initVariable(compiler, &ret.variable);
+                expression(compiler);
+                consume(compiler, RBRACKET_TOKEN, "Expected ']' after object key expression");
+                consume(compiler, COLON_TOKEN, "Expected ':' after object key expression");
+                // parse the alias
+                Pattern alias = parsePattern(compiler, NONE_PATTERN, declare);
+                ret.alias = ALLOCATE(compiler->parser->vm, Pattern);
+                memcpy(ret.alias, &alias, sizeof(Pattern));
+
+                continue;
+            }
             Pattern pattern = parsePattern(compiler, ret.type, declare);
             MSCWritePatternBuffer(compiler->parser->vm, &ret.as.object, pattern);
             if (pattern.type == REST_PATTERN) break;
         } while (match(compiler, COMMA_TOKEN));
         consume(compiler, RBRACE_TOKEN, "Expected '}' after object pattern");
     } else if (match(compiler, LBRACKET_TOKEN)) {
+
         ret.type = ARRAY_PATTERN;
         MSCInitPatternBuffer(&ret.as.array);
         do {
@@ -1453,6 +1470,8 @@ static Pattern parsePattern(Compiler *compiler, PatternType parent, bool declare
             if (pattern.type == REST_PATTERN) break;
         } while (match(compiler, COMMA_TOKEN));
         consume(compiler, RBRACKET_TOKEN, "Expected ']' after array pattern");
+
+
     }
     return ret;
 }
@@ -1520,7 +1539,7 @@ void handleDestructuration(Compiler *compiler, Pattern *pattern) {
 
         case OBJECT_PATTERN: {
             pushScope(compiler);
-            int tmpSlot = addLocal(compiler, "tmp_ ", 5);// store parrent in local variable
+            int tmpSlot = addLocal(compiler, "tmp_ ", 5);// store parent in local variable
             emitByteArg(compiler, OP_STORE_LOCAL, tmpSlot);
             null(compiler, false);
             int localMap = addLocal(compiler, "map_m ", 6);
@@ -1531,7 +1550,8 @@ void handleDestructuration(Compiler *compiler, Pattern *pattern) {
                 // load source
                 Pattern item = elements.data[i];
                 Token *sourceToken = &item.as.id;
-                Value str = MSCStringFromCharsWithLength(compiler->parser->vm, sourceToken->start, sourceToken->length);
+                Value str = sourceToken->type == STRING_CONST_TOKEN ? sourceToken->value : MSCStringFromCharsWithLength(
+                        compiler->parser->vm, sourceToken->start, sourceToken->length);
 
 
 
@@ -2028,7 +2048,7 @@ static void ifStatement(Compiler *compiler, bool expr) {
 
     // Compile the then branch.
     statement(compiler, expr);
-    ignoreNewlines(compiler);
+    // ignoreNewlines(compiler);
     // Compile the else branch if there is one.
     if (match(compiler, ELSE_TOKEN)) {
         // Jump over the else branch when the if branch is taken.
@@ -2913,7 +2933,30 @@ static void subscript(Compiler *compiler, bool canAssign) {
 }
 
 static void call(Compiler *compiler, bool canAssign) {
+    Token token = compiler->parser->previous;
     ignoreNewlines(compiler);
+
+    if (token.type == NULLCHECK_TOKEN) {
+        // add a check first
+        emitOp(compiler, OP_LOAD_ON);
+        null(compiler, false);
+        callMethod(compiler, 1, "==(_)", 5);// compare the expressison against null
+        // Jump the next value is left is true.
+        int ifJump = emitJump(compiler, OP_OR);
+
+        consume(compiler, ID_TOKEN, "Expect method or attribute name after '.'.");
+        // printf(":::(%.*s)\n", compiler->parser->previous.length, compiler->parser->previous.start);
+        // emitByte(compiler, OP_POP);
+        namedCall(compiler, canAssign, OP_CALL_0);
+
+        int finishJump = emitJump(compiler, OP_JUMP);
+        patchJump(compiler, ifJump);
+        // pop the comparision result
+        emitByte(compiler, OP_POP);
+        patchJump(compiler, finishJump);
+        return;
+
+    }
     consume(compiler, ID_TOKEN, "Expect method or attribute name after '.'.");
     // printf(":::(%.*s)\n", compiler->parser->previous.length, compiler->parser->previous.start);
     namedCall(compiler, canAssign, OP_CALL_0);
@@ -3024,29 +3067,31 @@ static void or_(Compiler *compiler, bool canAssign) {
 }
 
 static void conditional(Compiler *compiler, bool canAssign) {
-    // Ignore newline after '?'.
+    // Ignore newline after '??'.
+    // pushScope(compiler);
     ignoreNewlines(compiler);
-
-    // Jump to the else branch if the condition is false.
-    int ifJump = emitJump(compiler, OP_JUMP_IF);
-
+    // null check
+    /*Token tmpToken = newToken(ID_TOKEN, compiler->parser->previous.start,
+                              compiler->parser->previous.length,
+                              compiler->parser->previous.line, compiler->parser->previous.value);
+    int tmpSlot = declareVariable(compiler, &tmpToken);// store expression in local variable*/
+    // int tmpSlot = addLocal(compiler, "tmp_ ", 5);// store previous expression in local variable
+    emitOp(compiler, OP_LOAD_ON);
+    // defineVariable(compiler, tmpSlot);
+    // loadLocal(compiler, tmpSlot);// load the expression now for comparison
+    null(compiler, false);
+    callMethod(compiler, 1, "!=(_)", 5);// compare the expressison against null
+    // Jump the next value if left is true.
+    int ifJump = emitJump(compiler, OP_OR);
+    emitByte(compiler, OP_POP);
     // Compile the then branch.
-    parsePrecedence(compiler, PREC_CONDITIONAL);
-
-    consume(compiler, COLON_TOKEN,
-            "Expect ':' after then branch of conditional operator.");
-    ignoreNewlines(compiler);
-
-    // Jump over the else branch when the if branch is taken.
-    int elseJump = emitJump(compiler, OP_JUMP);
-
-    // Compile the else branch.
-    patchJump(compiler, ifJump);
-
     parsePrecedence(compiler, PREC_ASSIGNMENT);
-
-    // Patch the jump over the else.
-    patchJump(compiler, elseJump);
+    int finishJump = emitJump(compiler, OP_JUMP);
+    patchJump(compiler, ifJump);
+    // pop the comparision result
+    emitByte(compiler, OP_POP);
+    patchJump(compiler, finishJump);
+    // softPopScope(compiler);
 }
 
 void infixOp(Compiler *compiler, bool canAssign) {
@@ -3200,7 +3245,7 @@ void constructorSignature(Compiler *compiler, Signature *signature) {
 GrammarRule rules[] = {
         /* NUMBER_CONST_TOKEN           0 */ PREFIX(literal),
         /* TRING_CONST_TOKEN            1  */ PREFIX(literal),
-        /* PLUS_TOKEN                   2  */ INFIX_OPERATOR(PREC_TERM, "+"),
+        /* PLUS_TOKEN                   2  */ OPERATOR("+"),
         /* MINUS_TOKEN                  3  */ OPERATOR("-"),
         /* MULT_TOKEN                   4  */ INFIX_OPERATOR(PREC_FACTOR, "*"),
         /* DIV_TOKEN                    5  */ INFIX_OPERATOR(PREC_FACTOR, "/"),
@@ -3293,6 +3338,8 @@ GrammarRule rules[] = {
 
         /* MINUS_EQ_TOKEN                79 */ UNUSED,
         /* INVALID_TOKEN                 80 */ UNUSED,
+        /* NULLISH_TOKEN                 81 */ INFIX(PREC_NULLISH, conditional),
+        /* NULLCHECK_TOKEN               82 */ INFIX(PREC_CALL, call),
 
 };
 
@@ -3317,7 +3364,7 @@ static void parsePrecedence(Compiler *compiler, Precedence precedence) {
     // expressions that are valid lvalues -- names, subscripts, fields, etc. --
     // we pass in whether or not it appears in a context loose enough to allow
     // "=". If so, it will parse the "=" itself and handle it appropriately.
-    bool canAssign = precedence <= PREC_CONDITIONAL;
+    bool canAssign = precedence <= PREC_NULLISH;
     prefix(compiler, canAssign);
 
     while (precedence <= rules[compiler->parser->current.type].precedence) {
